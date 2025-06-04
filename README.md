@@ -1,5 +1,5 @@
 ---
-title: Speech To Speech WebGPU
+title: Conversational WebGPU
 colorFrom: indigo
 colorTo: red
 sdk: static
