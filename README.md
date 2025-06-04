@@ -1,6 +1,5 @@
 ---
 title: Speech To Speech WebGPU
-emoji: 🗣️
 colorFrom: indigo
 colorTo: red
 sdk: static
