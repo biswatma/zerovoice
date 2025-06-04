@@ -1,5 +1,5 @@
 ---
-title: React
+title: Speech To Speech Webgpu
 emoji: 🐠
 colorFrom: indigo
 colorTo: red
