@@ -7,10 +7,13 @@ ZeroVoice is a real-time speech-to-speech communication application built with m
 *   **Real-time Speech-to-Speech**: Seamless bidirectional audio communication.
 *   **Voice Activity Detection (VAD)**: Intelligently detects speech segments using Silero VAD.
 *   **Automatic Speech Recognition (ASR)**: Transcribes user's speech to text using HuggingFace Transformers.js (Whisper base model).
-*   **Large Language Model (LLM) Integration**: Generates conversational responses using the SmolLM2-1.7B-Instruct model.
+*   **Large Language Model (LLM) Integration**: Generates conversational responses using either:
+    *   Browser-based SmolLM2-1.7B-Instruct model (default)
+    *   Local LM Studio API for more powerful models
 *   **Text-to-Speech (TTS)**: Synthesizes AI responses into natural-sounding speech using KokoroTTS.
 *   **Responsive UI**: Built with React and Tailwind CSS for a modern and adaptive user experience.
 *   **Voice Selection**: Users can choose from various available voices for the AI assistant.
+*   **LLM Mode Toggle**: Switch between browser-based and LM Studio models with a simple toggle.
 *   **Call Timer**: Tracks the duration of the conversation.
 
 ## Technologies Used
@@ -63,10 +66,31 @@ To get the project up and running on your local machine, follow these steps:
 ## Usage
 
 *   Once the application loads, ensure the "Loading..." message disappears and "Ready!" is displayed, indicating that all AI models have been loaded.
+*   **Choose LLM Mode**: Use the toggle switch to choose between:
+    *   **Browser Mode** (default): Uses the built-in SmolLM2-1.7B-Instruct model running in your browser
+    *   **LM Studio Mode**: Connects to a local LM Studio instance for more powerful models
 *   Click the "Start call" button to begin interaction. You may be prompted to grant microphone access.
 *   Speak naturally, and the AI assistant will respond in real-time.
 *   You can select different voices for the AI assistant using the dropdown menu.
 *   To end the conversation, click the "End call" button.
+
+## LM Studio Integration
+
+To use LM Studio for more powerful language models:
+
+1.  **Install LM Studio**: Download and install [LM Studio](https://lmstudio.ai/) on your local machine.
+
+2.  **Load a Model**: In LM Studio, download and load any compatible language model (e.g., Llama, Mistral, etc.).
+
+3.  **Start the Server**: In LM Studio, go to the "Local Server" tab and start the server on the default port (1234).
+
+4.  **Configure ZeroVoice**: 
+    *   Toggle the "LLM Mode" switch to "LM Studio" in the ZeroVoice interface
+    *   The application will automatically connect to LM Studio via a proxy (no additional configuration needed)
+
+5.  **Start Conversation**: Begin your conversation as usual. The application will now use your local LM Studio model for generating responses.
+
+**Note**: LM Studio must be running and serving a model for the integration to work. If LM Studio is not available, the application will fall back to the browser-based model.
 
 ## Linting
 

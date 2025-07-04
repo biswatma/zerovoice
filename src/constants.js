@@ -51,3 +51,12 @@ export const NEW_BUFFER_SIZE = 512;
 export const MAX_NUM_PREV_BUFFERS = Math.ceil(
   SPEECH_PAD_SAMPLES / NEW_BUFFER_SIZE,
 );
+
+/**
+ * LM Studio configuration
+ */
+export const LM_STUDIO_CONFIG = {
+  BASE_URL: "/api/lmstudio/v1",
+  DEFAULT_MODEL: "local-model", // This will be auto-detected from LM Studio
+  SYSTEM_MESSAGE: "You're a helpful and conversational voice assistant. Keep your responses short, clear, and casual.",
+};

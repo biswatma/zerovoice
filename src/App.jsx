@@ -11,6 +11,7 @@ export default function App() {
 
   const [voice, setVoice] = useState("af_heart");
   const [voices, setVoices] = useState([]);
+  const [useLMStudio, setUseLMStudio] = useState(false);
 
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -32,6 +33,13 @@ export default function App() {
       voice,
     });
   }, [voice]);
+
+  useEffect(() => {
+    worker.current?.postMessage({
+      type: "set_llm_mode",
+      useLMStudio,
+    });
+  }, [useLMStudio]);
 
   useEffect(() => {
     if (!callStarted) {
@@ -339,6 +347,31 @@ export default function App() {
         </div>
 
         <div className="space-y-4 w-[140px]">
+          {/* LLM Mode Toggle */}
+          <div className="flex flex-col space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              LLM Mode
+            </label>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setUseLMStudio(!useLMStudio)}
+                disabled={callStarted}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                  useLMStudio ? "bg-blue-600" : "bg-gray-200"
+                } ${callStarted ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    useLMStudio ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+              <span className="text-xs text-gray-600">
+                {useLMStudio ? "LM Studio" : "Browser"}
+              </span>
+            </div>
+          </div>
+
           {callStarted ? (
             <button
               className="flex items-center space-x-2 px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200"

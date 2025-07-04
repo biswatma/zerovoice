@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: "/zerovoice/",
+  // base: "/zerovoice/",
   plugins: [tailwindcss(), react()],
   build: {
     target: "esnext",
@@ -16,5 +16,14 @@ export default defineConfig({
     // Only bundle a single instance of Transformers.js
     // (shared by `@huggingface/transformers` and `kokoro-js`)
     dedupe: ["@huggingface/transformers"],
+  },
+  server: {
+    proxy: {
+      '/api/lmstudio': {
+        target: 'http://localhost:1234',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/lmstudio/, ''),
+      },
+    },
   },
 });

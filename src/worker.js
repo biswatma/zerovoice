@@ -24,6 +24,7 @@ import {
   MAX_NUM_PREV_BUFFERS,
   MIN_SILENCE_DURATION_SAMPLES,
   MIN_SPEECH_DURATION_SAMPLES,
+  LM_STUDIO_CONFIG,
 } from "./constants";
 
 const model_id = "onnx-community/Kokoro-82M-v1.0-ONNX";
@@ -94,6 +95,8 @@ await llm.generate({ ...tokenizer("x"), max_new_tokens: 1 }); // Compile shaders
 let messages = [SYSTEM_MESSAGE];
 let past_key_values_cache;
 let stopping_criteria;
+let useLMStudio = false;
+
 self.postMessage({
   type: "status",
   status: "ready",
@@ -136,6 +139,78 @@ async function vad(buffer) {
 }
 
 /**
+ * Generate response using LM Studio API
+ * @param {Array} messages The conversation messages
+ * @param {TextSplitterStream} splitter The text splitter for streaming
+ * @returns {Promise<string>} The generated response
+ */
+async function generateWithLMStudio(messages, splitter) {
+  try {
+    // Ensure messages is properly formatted for LM Studio
+    const formattedMessages = messages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
+
+    console.log("Sending to LM Studio:", { messages: formattedMessages });
+
+    const response = await fetch(`${LM_STUDIO_CONFIG.BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: LM_STUDIO_CONFIG.DEFAULT_MODEL,
+        messages: formattedMessages,
+        stream: true,
+        max_tokens: 1024,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`LM Studio API error: ${response.status} ${response.statusText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullResponse = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (data === '[DONE]') continue;
+          
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content) {
+              fullResponse += content;
+              splitter.push(content);
+            }
+          } catch (e) {
+            // Skip invalid JSON lines
+          }
+        }
+      }
+    }
+
+    return fullResponse;
+  } catch (error) {
+    console.error("LM Studio API error:", error);
+    // Fallback to browser-based model
+    throw error;
+  }
+}
+
+/**
  * Transcribe the audio buffer
  * @param {Float32Array} buffer The audio buffer
  * @param {Object} data Additional data
@@ -147,6 +222,7 @@ const speechToSpeech = async (buffer, data) => {
   const text = await transcriber(buffer).then(({ text }) => text.trim());
   if (["", "[BLANK_AUDIO]"].includes(text)) {
     // If the transcription is empty or a blank audio, we skip the rest of the processing
+    isPlaying = false;
     return;
   }
   messages.push({ role: "user", content: text });
@@ -162,42 +238,60 @@ const speechToSpeech = async (buffer, data) => {
     }
   })();
 
-  // 2. Generate a response using the LLM
-  const inputs = tokenizer.apply_chat_template(messages, {
-    add_generation_prompt: true,
-    return_dict: true,
-  });
-  const streamer = new TextStreamer(tokenizer, {
-    skip_prompt: true,
-    skip_special_tokens: true,
-    callback_function: (text) => {
-      splitter.push(text);
-    },
-    token_callback_function: () => {},
-  });
+  let responseText = "";
 
-  stopping_criteria = new InterruptableStoppingCriteria();
-  const { past_key_values, sequences } = await llm.generate({
-    ...inputs,
-    past_key_values: past_key_values_cache,
+  try {
+    // 2. Generate a response using either LM Studio or browser-based LLM
+    if (useLMStudio) {
+      // Use LM Studio API
+      responseText = await generateWithLMStudio(messages, splitter);
+    } else {
+      // Use browser-based model
+      const inputs = tokenizer.apply_chat_template(messages, {
+        add_generation_prompt: true,
+        return_dict: true,
+      });
+      const streamer = new TextStreamer(tokenizer, {
+        skip_prompt: true,
+        skip_special_tokens: true,
+        callback_function: (text) => {
+          splitter.push(text);
+        },
+        token_callback_function: () => {},
+      });
 
-    do_sample: false, // TODO: do_sample: true is bugged (invalid data location on topk sample)
-    max_new_tokens: 1024,
-    streamer,
-    stopping_criteria,
-    return_dict_in_generate: true,
-  });
-  past_key_values_cache = past_key_values;
+      stopping_criteria = new InterruptableStoppingCriteria();
+      const { past_key_values, sequences } = await llm.generate({
+        ...inputs,
+        past_key_values: past_key_values_cache,
 
-  // Finally, close the stream to signal that no more text will be added.
-  splitter.close();
+        do_sample: false, // TODO: do_sample: true is bugged (invalid data location on topk sample)
+        max_new_tokens: 1024,
+        streamer,
+        stopping_criteria,
+        return_dict_in_generate: true,
+      });
+      past_key_values_cache = past_key_values;
 
-  const decoded = tokenizer.batch_decode(
-    sequences.slice(null, [inputs.input_ids.dims[1], null]),
-    { skip_special_tokens: true },
-  );
+      const decoded = tokenizer.batch_decode(
+        sequences.slice(null, [inputs.input_ids.dims[1], null]),
+        { skip_special_tokens: true },
+      );
+      responseText = decoded[0];
+    }
 
-  messages.push({ role: "assistant", content: decoded[0] });
+    // Finally, close the stream to signal that no more text will be added.
+    splitter.close();
+
+    messages.push({ role: "assistant", content: responseText });
+  } catch (error) {
+    console.error("LLM generation error:", error);
+    // Fallback response
+    const fallbackText = "I'm sorry, I'm having trouble processing your request right now.";
+    splitter.push(fallbackText);
+    splitter.close();
+    messages.push({ role: "assistant", content: fallbackText });
+  }
 };
 
 // Track the number of samples after the last speech chunk
@@ -265,6 +359,9 @@ self.onmessage = async (event) => {
       return;
     case "set_voice":
       voice = event.data.voice;
+      return;
+    case "set_llm_mode":
+      useLMStudio = event.data.useLMStudio;
       return;
     case "playback_ended":
       isPlaying = false;
